@@ -1,7 +1,7 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import {Linking, NativeModules, Platform} from 'react-native';
+import {Linking} from 'react-native';
 import {Navigation} from 'react-native-navigation';
 import {Provider} from 'react-redux';
 
@@ -21,9 +21,6 @@ import EphemeralStore from 'app/store/ephemeral_store';
 import telemetry from 'app/telemetry';
 import pushNotificationsUtils from 'app/utils/push_notifications';
 
-const {MattermostShare} = NativeModules;
-const sharedExtensionStarted = Platform.OS === 'android' && MattermostShare.isOpened;
-
 const init = async () => {
     const credentials = await getAppCredentials();
     if (EphemeralStore.appStarted) {
@@ -39,31 +36,32 @@ const init = async () => {
 
     registerScreens(store, Provider);
 
-    if (sharedExtensionStarted) {
-        EphemeralStore.appStarted = true;
-    }
-
     if (!EphemeralStore.appStarted) {
         launchAppAndAuthenticateIfNeeded(credentials);
     }
 };
 
-const launchApp = async (credentials) => {
+const launchApp = (credentials) => {
     telemetry.start([
         'start:select_server_screen',
         'start:channel_screen',
     ]);
 
     if (credentials) {
-        await waitForHydration(store);
-        store.dispatch(loadMe());
-        resetToChannel({skipMetrics: true});
+        waitForHydration(store, () => {
+            store.dispatch(loadMe());
+            resetToChannel({skipMetrics: true});
+        });
     } else {
         resetToSelectServer(emmProvider.allowOtherServers);
     }
 
     telemetry.startSinceLaunch(['start:splash_screen']);
     EphemeralStore.appStarted = true;
+
+    Linking.getInitialURL().then((url) => {
+        store.dispatch(setDeepLinkURL(url));
+    });
 };
 
 const launchAppAndAuthenticateIfNeeded = async (credentials) => {
@@ -79,10 +77,6 @@ const launchAppAndAuthenticateIfNeeded = async (credentials) => {
             await emmProvider.handleAuthentication(store);
         }
     }
-
-    Linking.getInitialURL().then((url) => {
-        store.dispatch(setDeepLinkURL(url));
-    });
 };
 
 Navigation.events().registerAppLaunchedListener(() => {

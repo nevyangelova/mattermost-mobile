@@ -125,7 +125,7 @@ const getEmojisBySection = createSelector(
         }
 
         return emoticons;
-    }
+    },
 );
 
 const getEmojisByName = createSelector(
@@ -137,7 +137,7 @@ const getEmojisByName = createSelector(
         }
 
         return Array.from(emoticons);
-    }
+    },
 );
 
 function mapStateToProps(state) {
@@ -165,7 +165,6 @@ function mapStateToProps(state) {
         theme: getTheme(state),
         customEmojisEnabled: getConfig(state).EnableCustomEmoji === 'true',
         customEmojiPage: state.views.emoji.emojiPickerCustomPage,
-        serverVersion: state.entities.general.serverVersion,
     };
 }
 

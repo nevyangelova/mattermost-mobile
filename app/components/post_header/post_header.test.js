@@ -29,6 +29,7 @@ describe('PostHeader', () => {
         username: 'JohnSmith',
         isBot: false,
         isGuest: false,
+        isLandscape: false,
         userTimezone: '',
         enableTimezone: false,
         previousPostExists: false,
@@ -40,7 +41,7 @@ describe('PostHeader', () => {
 
     test('should match snapshot when just a base post', () => {
         const wrapper = shallow(
-            <PostHeader {...baseProps}/>
+            <PostHeader {...baseProps}/>,
         );
         expect(wrapper.getElement()).toMatchSnapshot();
         expect(wrapper.find('#ReplyIcon').exists()).toEqual(false);
@@ -54,7 +55,7 @@ describe('PostHeader', () => {
         };
 
         const wrapper = shallow(
-            <PostHeader {...props}/>
+            <PostHeader {...props}/>,
         );
         expect(wrapper.getElement()).toMatchSnapshot();
     });
@@ -66,7 +67,7 @@ describe('PostHeader', () => {
         };
 
         const wrapper = shallow(
-            <PostHeader {...props}/>
+            <PostHeader {...props}/>,
         );
         expect(wrapper.getElement()).toMatchSnapshot();
     });
@@ -78,7 +79,7 @@ describe('PostHeader', () => {
         };
 
         const wrapper = shallow(
-            <PostHeader {...props}/>
+            <PostHeader {...props}/>,
         );
         expect(wrapper.getElement()).toMatchSnapshot();
         expect(wrapper.find('#ReplyIcon').exists()).toEqual(false);
@@ -91,7 +92,7 @@ describe('PostHeader', () => {
         };
 
         const wrapper = shallow(
-            <PostHeader {...props}/>
+            <PostHeader {...props}/>,
         );
         expect(wrapper.getElement()).toMatchSnapshot();
         expect(wrapper.find('#ReplyIcon').exists()).toEqual(false);
@@ -107,7 +108,7 @@ describe('PostHeader', () => {
         };
 
         const wrapper = shallow(
-            <PostHeader {...props}/>
+            <PostHeader {...props}/>,
         );
         expect(wrapper.getElement()).toMatchSnapshot();
     });
@@ -122,7 +123,34 @@ describe('PostHeader', () => {
         };
 
         const wrapper = shallow(
-            <PostHeader {...props}/>
+            <PostHeader {...props}/>,
+        );
+        expect(wrapper.getElement()).toMatchSnapshot();
+    });
+
+    test('should match snapshot when just a base post in landscape mode', () => {
+        const props = {
+            ...baseProps,
+            isLandscape: true,
+        };
+
+        const wrapper = shallow(
+            <PostHeader {...props}/>,
+        );
+        expect(wrapper.getElement()).toMatchSnapshot();
+        expect(wrapper.find('#ReplyIcon').exists()).toEqual(false);
+    });
+
+    test('should match snapshot when post isBot and shouldRenderReplyButton in landscape mode', () => {
+        const props = {
+            ...baseProps,
+            shouldRenderReplyButton: true,
+            isBot: true,
+            isLandscape: true,
+        };
+
+        const wrapper = shallow(
+            <PostHeader {...props}/>,
         );
         expect(wrapper.getElement()).toMatchSnapshot();
     });

@@ -42,6 +42,7 @@ commands:
       for:
         type: string
     steps:
+      - ruby-setup
       - restore_cache:
           name: Restore Fastlane cache
           key: v1-gems-<< parameters.for >>-{{ checksum "fastlane/Gemfile.lock" }}-{{ arch }}
@@ -198,6 +199,12 @@ commands:
       - store_artifacts:
           path: ~/mattermost-mobile/<<parameters.filename>>
 
+  ruby-setup:
+    steps:
+      - run:
+          name: Set Ruby Version
+          command: echo "ruby-2.6.3" > ~/.ruby-version
+
 jobs:
   test:
     working_directory: ~/mattermost-mobile
@@ -292,6 +299,7 @@ jobs:
     steps:
       - checkout:
           path: ~/mattermost-mobile
+      - ruby-setup
       - npm-dependencies
       - pods-dependencies
       - assets
@@ -301,8 +309,13 @@ jobs:
           working_directory: fastlane
           name: Run fastlane to build unsigned iOS
           no_output_timeout: 30m
-          command: bundle exec fastlane ios unsigned
-      - persist
+          command: |
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install watchman
+            bundle exec fastlane ios unsigned
+      - persist_to_workspace:
+          root: ~/
+          paths:
+            - mattermost-mobile/Mattermost-unsigned.ipa
       - save:
           filename: "Mattermost-unsigned.ipa"
 
@@ -311,6 +324,7 @@ jobs:
       name: android
       resource_class: medium
     steps:
+      - ruby-setup
       - deploy-to-store:
           task: "Deploy to Google Play"
           target: android
@@ -321,6 +335,7 @@ jobs:
       name: android
       resource_class: medium
     steps:
+      - ruby-setup
       - deploy-to-store:
           task: "Deploy to Google Play"
           target: android
@@ -329,6 +344,7 @@ jobs:
   deploy-ios-release:
     executor: ios
     steps:
+      - ruby-setup
       - deploy-to-store:
           task: "Deploy to TestFlight"
           target: ios
@@ -337,6 +353,7 @@ jobs:
   deploy-ios-beta:
     executor: ios
     steps:
+      - ruby-setup
       - deploy-to-store:
           task: "Deploy to TestFlight"
           target: ios
@@ -347,6 +364,7 @@ jobs:
       name: android
       resource_class: medium
     steps:
+      - ruby-setup
       - attach_workspace:
           at: ~/
       - run:
@@ -467,7 +485,7 @@ workflows:
             tags:
               only: /^v(\d+\.)(\d+\.)(\d+)(.*)?$/
             branches:
-              ignore: /.*/
+              only: unsigned
       - build-ios-unsigned:
           context: mattermost-mobile-unsigned
           requires:
@@ -476,7 +494,7 @@ workflows:
             tags:
               only: /^v(\d+\.)(\d+\.)(\d+)(.*)?$/
             branches:
-              ignore: /.*/
+              only: unsigned
       - github-release:
           context: mattermost-mobile-unsigned
           requires:
@@ -486,4 +504,4 @@ workflows:
             tags:
               only: /^v(\d+\.)(\d+\.)(\d+)(.*)?$/
             branches:
-              ignore: /.*/
+              only: unsigned

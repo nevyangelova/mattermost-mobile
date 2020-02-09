@@ -105,7 +105,10 @@ export default class SettingsDrawer extends PureComponent {
     };
 
     handleAndroidBack = () => {
-        if (this.drawerRef && this.drawerOpened) {
+        if (this.statusModal) {
+            this.statusModal = false;
+            return false;
+        } else if (this.drawerRef && this.drawerOpened) {
             this.drawerRef.closeDrawer();
             return true;
         }
@@ -163,6 +166,7 @@ export default class SettingsDrawer extends PureComponent {
             },
         }];
 
+        this.statusModal = true;
         showModalOverCurrentContext('OptionsModal', {items});
     });
 
@@ -174,7 +178,7 @@ export default class SettingsDrawer extends PureComponent {
         this.openModal(
             'EditProfile',
             formatMessage({id: 'mobile.routes.edit_profile', defaultMessage: 'Edit Profile'}),
-            {currentUser, commandType}
+            {currentUser, commandType},
         );
     });
 
@@ -203,7 +207,7 @@ export default class SettingsDrawer extends PureComponent {
         this.openModal(
             'UserProfile',
             formatMessage({id: 'mobile.routes.user_profile', defaultMessage: 'Profile'}),
-            {userId, fromSettings: true}
+            {userId, fromSettings: true},
         );
     });
 

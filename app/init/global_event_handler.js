@@ -2,8 +2,10 @@
 // See LICENSE.txt for license information.
 
 import {Alert, AppState, Dimensions, Linking, NativeModules, Platform} from 'react-native';
+import CookieManager from 'react-native-cookies';
 import DeviceInfo from 'react-native-device-info';
-import semver from 'semver';
+import RNFetchBlob from 'rn-fetch-blob';
+import semver from 'semver/preload';
 
 import {setAppState, setServerVersion} from 'mattermost-redux/actions/general';
 import {loadMe, logout} from 'mattermost-redux/actions/users';
@@ -22,6 +24,7 @@ import {showOverlay} from 'app/actions/navigation';
 import {loadConfigAndLicense, setDeepLinkURL, startDataCleanup} from 'app/actions/views/root';
 import {NavigationTypes, ViewTypes} from 'app/constants';
 import {getTranslations, resetMomentLocale} from 'app/i18n';
+import mattermostBucket from 'app/mattermost_bucket';
 import mattermostManaged from 'app/mattermost_managed';
 import PushNotifications from 'app/push_notifications';
 import {getCurrentLocale} from 'app/selectors/i18n';
@@ -95,7 +98,7 @@ class GlobalEventHandler {
             StatusBarManager.getHeight(
                 (data) => {
                     this.onStatusBarHeightChange(data.height);
-                }
+                },
             );
         }
 
@@ -148,11 +151,36 @@ class GlobalEventHandler {
     onLogout = async () => {
         this.store.dispatch(closeWebSocket(false));
         this.store.dispatch(setServerVersion(''));
-        deleteFileCache();
         removeAppCredentials();
+        deleteFileCache();
         resetMomentLocale();
 
+        // TODO: Handle when multi-server support is added
+        CookieManager.clearAll(Platform.OS === 'ios');
         PushNotifications.clearNotifications();
+        const cacheDir = RNFetchBlob.fs.dirs.CacheDir;
+        const mainPath = cacheDir.split('/').slice(0, -1).join('/');
+
+        try {
+            await RNFetchBlob.fs.unlink(cacheDir);
+        } catch (e) {
+            console.log('Failed to remove cache folder', e); //eslint-disable-line no-console
+        }
+
+        mattermostBucket.removePreference('cert');
+        if (Platform.OS === 'ios') {
+            mattermostBucket.removeFile('entities');
+        } else {
+            const cookies = await RNFetchBlob.fs.exists(`${mainPath}/app_webview/Cookies`);
+            const cookiesJ = await RNFetchBlob.fs.exists(`${mainPath}/app_webview/Cookies-journal`);
+            if (cookies) {
+                RNFetchBlob.fs.unlink(`${mainPath}/app_webview/Cookies`);
+            }
+
+            if (cookiesJ) {
+                RNFetchBlob.fs.unlink(`${mainPath}/app_webview/Cookies-journal`);
+            }
+        }
 
         if (this.launchApp) {
             this.launchApp();
@@ -185,7 +213,7 @@ class GlobalEventHandler {
             StatusBarManager.getHeight(
                 (data) => {
                     this.onStatusBarHeightChange(data.height);
-                }
+                },
             );
         }
 
@@ -198,7 +226,8 @@ class GlobalEventHandler {
     onServerVersionChanged = async (serverVersion) => {
         const {dispatch, getState} = this.store;
         const state = getState();
-        const version = serverVersion.match(/^[0-9]*.[0-9]*.[0-9]*(-[a-zA-Z0-9.-]*)?/g)[0];
+        const match = serverVersion && serverVersion.match(/^[0-9]*.[0-9]*.[0-9]*(-[a-zA-Z0-9.-]*)?/g);
+        const version = match && match[0];
         const locale = getCurrentLocale(state);
         const translations = getTranslations(locale);
 
@@ -211,7 +240,7 @@ class GlobalEventHandler {
                         text: translations[t('mobile.server_upgrade.button')],
                         onPress: this.serverUpgradeNeeded,
                     }],
-                    {cancelable: false}
+                    {cancelable: false},
                 );
             } else if (state.entities.users && state.entities.users.currentUserId) {
                 dispatch(setServerVersion(serverVersion));

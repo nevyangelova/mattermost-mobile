@@ -135,6 +135,9 @@ describe('Actions.Views.Channel', () => {
     channelSelectors.getCurrentChannelId = jest.fn(() => currentChannelId);
     channelSelectors.getMyChannelMember = jest.fn(() => ({data: {member: {}}}));
 
+    const appChannelSelectors = require('app/selectors/channel');
+    appChannelSelectors.getChannelReachable = jest.fn(() => true);
+
     test('handleSelectChannelByName success', async () => {
         store = mockStore(storeObj);
 
@@ -152,7 +155,7 @@ describe('Actions.Views.Channel', () => {
     test('handleSelectChannelByName failure from null currentTeamName', async () => {
         const failStoreObj = {...storeObj};
         failStoreObj.entities.teams.teams.currentTeamId = 'not-in-current-teams';
-        store = mockStore(storeObj);
+        store = mockStore(failStoreObj);
 
         await store.dispatch(handleSelectChannelByName(currentChannelName, null));
 
@@ -162,6 +165,35 @@ describe('Actions.Views.Channel', () => {
 
         const storeBatchActions = storeActions.some(({type}) => type === 'BATCHING_REDUCER.BATCH');
         expect(storeBatchActions).toBe(false);
+    });
+
+    test('handleSelectChannelByName failure from no permission to channel', async () => {
+        actions.getChannelByNameAndTeamName = jest.fn(() => {
+            return {
+                type: 'MOCK_ERROR',
+                error: {
+                    message: "Can't get to channel.",
+                },
+            };
+        });
+
+        await store.dispatch(handleSelectChannelByName(currentChannelName, currentTeamName));
+
+        const storeActions = store.getActions();
+        const receivedChannel = storeActions.some((action) => action.type === MOCK_RECEIVE_CHANNEL_TYPE);
+        expect(receivedChannel).toBe(false);
+    });
+
+    test('handleSelectChannelByName failure from unreachable channel', async () => {
+        appChannelSelectors.getChannelReachable = jest.fn(() => false);
+
+        store = mockStore(storeObj);
+
+        await store.dispatch(handleSelectChannelByName(currentChannelName, currentTeamName));
+
+        const storeActions = store.getActions();
+        const receivedChannel = storeActions.some((action) => action.type === MOCK_RECEIVE_CHANNEL_TYPE);
+        expect(receivedChannel).toBe(false);
     });
 
     test('loadPostsIfNecessaryWithRetry for the first time', async () => {

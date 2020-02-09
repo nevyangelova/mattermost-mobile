@@ -7,13 +7,11 @@ import {KeyboardTrackingView} from 'react-native-keyboard-tracking-view';
 
 import Autocomplete, {AUTOCOMPLETE_MAX_HEIGHT} from 'app/components/autocomplete';
 import ChannelLoader from 'app/components/channel_loader';
-import FileUploadPreview from 'app/components/file_upload_preview';
 import NetworkIndicator from 'app/components/network_indicator';
 import PostTextbox from 'app/components/post_textbox';
 import SafeAreaView from 'app/components/safe_area_view';
 import StatusBar from 'app/components/status_bar';
 import {DeviceTypes} from 'app/constants';
-import {peek} from 'app/actions/navigation';
 
 import LocalConfig from 'assets/config';
 
@@ -26,14 +24,6 @@ const CHANNEL_POST_TEXTBOX_CURSOR_CHANGE = 'onChannelTextBoxCursorChange';
 const CHANNEL_POST_TEXTBOX_VALUE_CHANGE = 'onChannelTextBoxValueChange';
 
 export default class ChannelIOS extends ChannelBase {
-    previewChannel = (passProps, options) => {
-        const screen = 'ChannelPeek';
-
-        peek(screen, passProps, options);
-    };
-
-    optionalProps = {previewChannel: this.previewChannel};
-
     render() {
         const {height} = Dimensions.get('window');
         const {currentChannelId} = this.props;
@@ -57,7 +47,6 @@ export default class ChannelIOS extends ChannelBase {
                         updateNativeScrollView={this.updateNativeScrollView}
                     />
                     <View nativeID={ACCESSORIES_CONTAINER_NATIVE_ID}>
-                        <FileUploadPreview/>
                         <Autocomplete
                             maxHeight={AUTOCOMPLETE_MAX_HEIGHT}
                             onChangeText={this.handleAutoComplete}
@@ -86,6 +75,6 @@ export default class ChannelIOS extends ChannelBase {
             </React.Fragment>
         );
 
-        return this.renderChannel(drawerContent, this.optionalProps);
+        return this.renderChannel(drawerContent);
     }
 }

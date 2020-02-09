@@ -14,8 +14,6 @@ import {
     leaveChannel as serviceLeaveChannel,
     selectChannel,
     getChannelStats,
-    getChannels,
-    getArchivedChannels,
 } from 'mattermost-redux/actions/channels';
 import {
     getPosts,
@@ -35,8 +33,11 @@ import {
     getMyChannelMember,
     getRedirectChannelNameForTeam,
     getChannelsNameMapInTeam,
+    isManuallyUnread,
 } from 'mattermost-redux/selectors/entities/channels';
 import {getCurrentTeamId, getTeamByName} from 'mattermost-redux/selectors/entities/teams';
+
+import {getChannelReachable} from 'app/selectors/channel';
 
 import telemetry from 'app/telemetry';
 
@@ -63,35 +64,19 @@ export function loadChannelsIfNecessary(teamId) {
     };
 }
 
-export function loadChannelsByTeamName(teamName) {
+export function loadChannelsByTeamName(teamName, errorHandler) {
     return async (dispatch, getState) => {
         const state = getState();
         const {currentTeamId} = state.entities.teams;
         const team = getTeamByName(state, teamName);
 
+        if (!team && errorHandler) {
+            errorHandler();
+        }
+
         if (team && team.id !== currentTeamId) {
             await dispatch(fetchMyChannelsAndMembers(team.id));
         }
-    };
-}
-
-export function loadPublicAndArchivedChannels(teamId, publicPage, archivedPage, perPage, shouldLoadArchivedChannels) {
-    return async (dispatch) => {
-        return dispatch(getChannels(
-            teamId,
-            publicPage,
-            perPage
-        )).then(async (publicChannels) => {
-            if (shouldLoadArchivedChannels) {
-                const archivedChannels = await dispatch(getArchivedChannels(
-                    teamId,
-                    archivedPage,
-                    perPage
-                ));
-                return archivedChannels;
-            }
-            return publicChannels;
-        });
     };
 }
 
@@ -421,14 +406,25 @@ export function handleSelectChannel(channelId, fromPushNotification = false) {
     };
 }
 
-export function handleSelectChannelByName(channelName, teamName) {
+export function handleSelectChannelByName(channelName, teamName, errorHandler) {
     return async (dispatch, getState) => {
         const state = getState();
         const {teams: currentTeams, currentTeamId} = state.entities.teams;
         const currentTeam = currentTeams[currentTeamId];
         const currentTeamName = currentTeam?.name;
-        const {data: channel} = await dispatch(getChannelByNameAndTeamName(teamName || currentTeamName, channelName));
+        const response = await dispatch(getChannelByNameAndTeamName(teamName || currentTeamName, channelName));
+        const {error, data: channel} = response;
         const currentChannelId = getCurrentChannelId(state);
+        const reachable = getChannelReachable(state, channelName, teamName);
+
+        if (!reachable && errorHandler) {
+            errorHandler();
+        }
+
+        // Fallback to API response error, if any.
+        if (error) {
+            return {error};
+        }
 
         if (teamName && teamName !== currentTeamName) {
             const team = getTeamByName(state, teamName);
@@ -438,6 +434,8 @@ export function handleSelectChannelByName(channelName, teamName) {
         if (channel && currentChannelId !== channel.id) {
             dispatch(handleSelectChannel(channel.id));
         }
+
+        return null;
     };
 }
 
@@ -466,6 +464,17 @@ export function markChannelViewedAndRead(channelId, previousChannelId, markOnSer
     return (dispatch) => {
         dispatch(markChannelAsRead(channelId, previousChannelId, markOnServer));
         dispatch(markChannelAsViewed(channelId, previousChannelId));
+    };
+}
+
+export function markChannelViewedAndReadOnReconnect(channelId) {
+    return (dispatch, getState) => {
+        if (isManuallyUnread(getState(), channelId)) {
+            return;
+        }
+
+        dispatch(markChannelAsRead(channelId));
+        dispatch(markChannelAsViewed(channelId));
     };
 }
 
@@ -669,6 +678,16 @@ export function increasePostVisibility(channelId, postId) {
         telemetry.save();
 
         return hasMorePost;
+    };
+}
+
+export function increasePostVisibilityByOne(channelId) {
+    return (dispatch) => {
+        dispatch({
+            type: ViewTypes.INCREASE_POST_VISIBILITY,
+            data: channelId,
+            amount: 1,
+        });
     };
 }
 

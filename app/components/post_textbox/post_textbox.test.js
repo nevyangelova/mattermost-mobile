@@ -2,19 +2,27 @@
 // See LICENSE.txt for license information.
 
 import React from 'react';
-import {Alert} from 'react-native';
+import {Alert, Image} from 'react-native';
 import assert from 'assert';
 import {shallowWithIntl} from 'test/intl-test-helper';
 
 import Preferences from 'mattermost-redux/constants/preferences';
 import EventEmitter from 'mattermost-redux/utils/event_emitter';
 
-import Fade from 'app/components/fade';
 import SendButton from 'app/components/send_button';
 import PasteableTextInput from 'app/components/pasteable_text_input';
 import EphemeralStore from 'app/store/ephemeral_store';
 
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import FileUploadButton from './components/file_upload_button';
+import ImageUploadButton from './components/image_upload_button';
+import CameraButton from './components/camera_button';
+
 import PostTextbox from './post_textbox.ios';
+
+jest.mock('react-native-image-picker', () => ({
+    launchCamera: jest.fn(),
+}));
 
 describe('PostTextBox', () => {
     const baseProps = {
@@ -60,7 +68,7 @@ describe('PostTextBox', () => {
 
     test('should match, full snapshot', () => {
         const wrapper = shallowWithIntl(
-            <PostTextbox {...baseProps}/>
+            <PostTextbox {...baseProps}/>,
         );
 
         expect(wrapper.getElement()).toMatchSnapshot();
@@ -68,7 +76,7 @@ describe('PostTextBox', () => {
 
     test('should emit the event but no text is save to draft', () => {
         const wrapper = shallowWithIntl(
-            <PostTextbox {...baseProps}/>
+            <PostTextbox {...baseProps}/>,
         );
 
         wrapper.setState({value: 'some text'});
@@ -82,7 +90,7 @@ describe('PostTextBox', () => {
 
     test('should emit the event and text is save to draft', () => {
         const wrapper = shallowWithIntl(
-            <PostTextbox {...baseProps}/>
+            <PostTextbox {...baseProps}/>,
         );
 
         const instance = wrapper.instance();
@@ -96,7 +104,7 @@ describe('PostTextBox', () => {
 
     test('should not send multiple alerts when message is too long', () => {
         const wrapper = shallowWithIntl(
-            <PostTextbox {...baseProps}/>
+            <PostTextbox {...baseProps}/>,
         );
 
         const instance = wrapper.instance();
@@ -257,7 +265,7 @@ describe('PostTextBox', () => {
             },
         ]) {
             const wrapper = shallowWithIntl(
-                <PostTextbox {...baseProps}/>
+                <PostTextbox {...baseProps}/>,
             );
             const containsAtChannel = wrapper.instance().textContainsAtAllAtChannel(data.text);
             assert.equal(containsAtChannel, data.result, data.text);
@@ -267,10 +275,9 @@ describe('PostTextBox', () => {
     describe('send button', () => {
         test('should initially disable and hide the send button', () => {
             const wrapper = shallowWithIntl(
-                <PostTextbox {...baseProps}/>
+                <PostTextbox {...baseProps}/>,
             );
 
-            expect(wrapper.find(Fade).prop('visible')).toBe(false);
             expect(wrapper.find(SendButton).prop('disabled')).toBe(true);
         });
 
@@ -281,10 +288,9 @@ describe('PostTextBox', () => {
             };
 
             const wrapper = shallowWithIntl(
-                <PostTextbox {...props}/>
+                <PostTextbox {...props}/>,
             );
 
-            expect(wrapper.find(Fade).prop('visible')).toBe(true);
             expect(wrapper.find(SendButton).prop('disabled')).toBe(true);
         });
 
@@ -295,10 +301,9 @@ describe('PostTextBox', () => {
             };
 
             const wrapper = shallowWithIntl(
-                <PostTextbox {...props}/>
+                <PostTextbox {...props}/>,
             );
 
-            expect(wrapper.find(Fade).prop('visible')).toBe(true);
             expect(wrapper.find(SendButton).prop('disabled')).toBe(false);
         });
 
@@ -309,10 +314,9 @@ describe('PostTextBox', () => {
             };
 
             const wrapper = shallowWithIntl(
-                <PostTextbox {...props}/>
+                <PostTextbox {...props}/>,
             );
 
-            expect(wrapper.find(Fade).prop('visible')).toBe(true);
             expect(wrapper.find(SendButton).prop('disabled')).toBe(false);
         });
 
@@ -323,14 +327,41 @@ describe('PostTextBox', () => {
             };
 
             const wrapper = shallowWithIntl(
-                <PostTextbox {...props}/>
+                <PostTextbox {...props}/>,
             );
 
             wrapper.setState({sendingMessage: true});
 
-            expect(wrapper.find(Fade).prop('visible')).toBe(true);
             expect(wrapper.find(SendButton).prop('disabled')).toBe(true);
         });
+    });
+
+    test('should preseve post message in the input field if the command failed', async () => {
+        const props = {...baseProps};
+        const errorResult = {error: {message: 'Error message'}};
+        props.actions.executeCommand = jest.fn().
+            mockResolvedValueOnce(errorResult).
+            mockResolvedValue({data: 'success'});
+
+        const wrapper = shallowWithIntl(
+            <PostTextbox {...props}/>,
+        );
+
+        const msg = '/fail preserve this text in the post draft';
+        const instance = wrapper.instance();
+        instance.handleTextChange(msg);
+        expect(wrapper.state('value')).toBe(msg);
+
+        // On error, should prompt Alert dialog and should remain text value
+        await instance.sendCommand(msg);
+        expect(Alert.alert).toHaveBeenCalledTimes(1);
+        expect(Alert.alert).toHaveBeenCalledWith('Error Executing Command', errorResult.error.message);
+        expect(wrapper.state('value')).toBe(msg);
+
+        // On success, should not prompt Alert dialog and should change text value to empty
+        await instance.sendCommand(msg);
+        expect(Alert.alert).toHaveBeenCalledTimes(1);
+        expect(wrapper.state('value')).toBe('');
     });
 
     describe('Paste images', () => {
@@ -394,7 +425,7 @@ describe('PostTextBox', () => {
                 <PostTextbox
                     {...baseProps}
                     maxFileSize={50 * 1024 * 1024}
-                />
+                />,
             );
             wrapper.find(PasteableTextInput).first().simulate('paste', null, [
                 {
@@ -435,6 +466,59 @@ describe('PostTextBox', () => {
             ]);
             expect(baseProps.actions.initUploadFiles).not.toHaveBeenCalled();
         });
+
+        test('should render all quick action icons', () => {
+            const wrapper = shallowWithIntl(<PostTextbox {...baseProps}/>);
+
+            // @ button
+            expect(wrapper.find(MaterialCommunityIcons).exists()).toBe(true);
+
+            // slash command button
+            expect(wrapper.find(Image).exists()).toBe(true);
+
+            expect(wrapper.find(FileUploadButton).exists()).toBe(true);
+            expect(wrapper.find(ImageUploadButton).exists()).toBe(true);
+            expect(wrapper.find(CameraButton).exists()).toBe(true);
+        });
+
+        test('should trigger text change when @ icon is tapped', () => {
+            const wrapper = shallowWithIntl(<PostTextbox {...baseProps}/>);
+            const instance = wrapper.instance();
+            instance.handleTextChange = jest.fn();
+
+            wrapper.find(MaterialCommunityIcons).parent().props().onPress();
+            expect(instance.handleTextChange).toHaveBeenCalledWith(`${instance.state.value}@`, true);
+        });
+
+        test('should disable slash icon if textbox value is NOT empty', () => {
+            const wrapper = shallowWithIntl(<PostTextbox {...baseProps}/>);
+            const instance = wrapper.instance();
+            instance.setState({value: 'Test'});
+            expect(wrapper.find(Image).parent().props().disabled).toBe(true);
+        });
+
+        test('should NOT render file upload icons when server forbids it', () => {
+            const props = {
+                ...baseProps,
+                canUploadFiles: false,
+            };
+
+            const wrapper = shallowWithIntl(<PostTextbox {...props}/>);
+
+            expect(wrapper.find(MaterialCommunityIcons).exists()).toBe(true);
+            expect(wrapper.find(Image).exists()).toBe(true);
+
+            expect(wrapper.find(FileUploadButton).exists()).toBe(false);
+            expect(wrapper.find(ImageUploadButton).exists()).toBe(false);
+            expect(wrapper.find(CameraButton).exists()).toBe(false);
+        });
+    });
+
+    test('should change state value on props change', () => {
+        const wrapper = shallowWithIntl(<PostTextbox {...baseProps}/>);
+        expect(wrapper.state('value')).toEqual('');
+        wrapper.setProps({value: 'value', channelId: 'channel-id2'});
+        expect(wrapper.state('value')).toEqual('value');
     });
 });
 

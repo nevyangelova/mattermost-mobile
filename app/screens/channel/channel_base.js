@@ -20,13 +20,13 @@ import SafeAreaView from 'app/components/safe_area_view';
 import SettingsSidebar from 'app/components/sidebars/settings';
 
 import {preventDoubleTap} from 'app/utils/tap';
-import {setNavigatorStyles} from 'app/utils/theme';
+import {makeStyleSheetFromTheme, setNavigatorStyles} from 'app/utils/theme';
 import PushNotifications from 'app/push_notifications';
 import EphemeralStore from 'app/store/ephemeral_store';
 import tracker from 'app/utils/time_tracker';
 import telemetry from 'app/telemetry';
 import {
-    goToScreen,
+    showModal,
     showModalOverCurrentContext,
 } from 'app/actions/navigation';
 
@@ -68,6 +68,10 @@ export default class ChannelBase extends PureComponent {
 
         this.postTextbox = React.createRef();
         this.keyboardTracker = React.createRef();
+
+        MaterialIcon.getImageSource('close', 20, props.theme.sidebarHeaderTextColor).then((source) => {
+            this.closeButton = source;
+        });
 
         setNavigatorStyles(props.componentId, props.theme);
 
@@ -198,11 +202,19 @@ export default class ChannelBase extends PureComponent {
         const {intl} = this.context;
         const screen = 'ChannelInfo';
         const title = intl.formatMessage({id: 'mobile.routes.channelInfo', defaultMessage: 'Info'});
+        const options = {
+            topBar: {
+                leftButtons: [{
+                    id: 'close-info',
+                    icon: this.closeButton,
+                }],
+            },
+        };
 
         Keyboard.dismiss();
 
         requestAnimationFrame(() => {
-            goToScreen(screen, title);
+            showModal(screen, title, null, options);
         });
     });
 
@@ -256,7 +268,7 @@ export default class ChannelBase extends PureComponent {
         }
     };
 
-    renderChannel(drawerContent, optionalProps = {}) {
+    renderChannel(drawerContent) {
         const {
             channelsRequestFailed,
             currentChannelId,
@@ -301,17 +313,19 @@ export default class ChannelBase extends PureComponent {
             );
         }
 
+        const baseStyle = getStyleFromTheme(theme);
         return (
             <MainSidebar
                 ref={this.channelSidebarRef}
                 blurPostTextBox={this.blurPostTextBox}
-                {...optionalProps}
             >
                 <SettingsSidebar
                     ref={this.settingsSidebarRef}
                     blurPostTextBox={this.blurPostTextBox}
                 >
-                    {drawerContent}
+                    <View style={baseStyle.backdrop}>
+                        {drawerContent}
+                    </View>
                 </SettingsSidebar>
                 <InteractiveDialogController
                     theme={theme}
@@ -326,6 +340,15 @@ export default class ChannelBase extends PureComponent {
         return; // eslint-disable-line no-useless-return
     }
 }
+
+const getStyleFromTheme = makeStyleSheetFromTheme((theme) => {
+    return {
+        backdrop: {
+            flex: 1,
+            backgroundColor: theme.centerChannelBg,
+        },
+    };
+});
 
 export const style = StyleSheet.create({
     flex: {

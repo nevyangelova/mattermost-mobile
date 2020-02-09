@@ -1,9 +1,9 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import emojiRegex from 'emoji-regex';
+import emojiRegex from "emoji-regex";
 
-import {Emojis, EmojiIndicesByAlias} from './emojis';
+import { Emojis, EmojiIndicesByAlias } from "./emojis";
 
 const RE_NAMED_EMOJI = /(:([a-zA-Z0-9_-]+):)/g;
 
@@ -29,7 +29,7 @@ const RE_EMOTICON = {
     heart: /(^|\s)(<3|&lt;3)(?=$|\s)/g, // <3
     broken_heart: /(^|\s)(<\/3|&lt;&#x2F;3)(?=$|\s)/g, // </3
     thumbsup: /(^|\s)(:\+1:)(?=$|\s)/g, // :+1:
-    thumbsdown: /(^|\s)(:-1:)(?=$|\s)/g, // :-1:
+    thumbsdown: /(^|\s)(:-1:)(?=$|\s)/g // :-1:
 };
 
 const MAX_JUMBO_EMOJIS = 4;
@@ -47,18 +47,23 @@ function isEmoticon(text) {
 }
 
 export function getEmoticonName(value) {
-    return Object.keys(RE_EMOTICON).find((key) => value.match(RE_EMOTICON[key]) !== null);
+    return Object.keys(RE_EMOTICON).find(
+        key => value.match(RE_EMOTICON[key]) !== null
+    );
 }
 
 export function hasEmojisOnly(message, customEmojis) {
-    if (!message || message.length === 0 || (/^\s{4}/).test(message)) {
-        return {isEmojiOnly: false, shouldRenderJumboEmoji: false};
+    if (!message || message.length === 0 || /^\s{4}/.test(message)) {
+        return { isEmojiOnly: false, shouldRenderJumboEmoji: false };
     }
 
-    const chunks = message.trim().split(' ').filter((m) => m && m.length > 0);
+    const chunks = message
+        .trim()
+        .split(" ")
+        .filter(m => m && m.length > 0);
 
     if (chunks.length === 0) {
-        return {isEmojiOnly: false, shouldRenderJumboEmoji: false};
+        return { isEmojiOnly: false, shouldRenderJumboEmoji: false };
     }
 
     let emojiCount = 0;
@@ -77,7 +82,7 @@ export function hasEmojisOnly(message, customEmojis) {
         }
 
         const matchUnicodeEmoji = chunk.match(RE_UNICODE_EMOJI);
-        if (matchUnicodeEmoji && matchUnicodeEmoji.join('') === chunk) {
+        if (matchUnicodeEmoji && matchUnicodeEmoji.join("") === chunk) {
             emojiCount += matchUnicodeEmoji.length;
             continue;
         }
@@ -87,12 +92,12 @@ export function hasEmojisOnly(message, customEmojis) {
             continue;
         }
 
-        return {isEmojiOnly: false, shouldRenderJumboEmoji: false};
+        return { isEmojiOnly: false, shouldRenderJumboEmoji: false };
     }
 
     return {
         isEmojiOnly: true,
-        shouldRenderJumboEmoji: emojiCount > 0 && emojiCount <= MAX_JUMBO_EMOJIS,
+        shouldRenderJumboEmoji: emojiCount > 0 && emojiCount <= MAX_JUMBO_EMOJIS
     };
 }
 
@@ -121,34 +126,60 @@ const defaultComparisonRule = (aName, bName) => {
     return aName.localeCompare(bName);
 };
 
-const thumbsDownComparisonRule = (other) =>
-    (other === 'thumbsup' || other === '+1' ? 1 : 0);
-const thumbsUpComparisonRule = (other) => (other === 'thumbsdown' || other === '-1' ? -1 : 0);
+const thumbsDownComparisonRule = other =>
+    other === "thumbsup" || other === "+1" ? 1 : 0;
+const thumbsUpComparisonRule = other =>
+    other === "thumbsdown" || other === "-1" ? -1 : 0;
 
 const customComparisonRules = {
     thumbsdown: thumbsDownComparisonRule,
-    '-1': thumbsDownComparisonRule,
+    "-1": thumbsDownComparisonRule,
     thumbsup: thumbsUpComparisonRule,
-    '+1': thumbsUpComparisonRule
+    "+1": thumbsUpComparisonRule
 };
 
-export function compareEmojis(emojiA, emojiB, searchedName) {
-    const aName = emojiA.name || emojiA.aliases[0];
-    const bName = emojiB.name || emojiB.aliases[0];
+function doDefaultComparison(aName, bName) {
+    if (customComparisonRules[aName]) {
+        return (
+            customComparisonRules[aName](bName) ||
+            defaultComparisonRule(aName, bName)
+        );
+    }
 
-    // Have the emojis that contain the search appear first
+    return defaultComparisonRule(aName, bName);
+}
+
+export function compareEmojis(emojiA, emojiB, searchedName) {
+    const aName = emojiA.name || (emojiA.aliases ? emojiA.aliases[0] : emojiA);
+    const bName = emojiB.name || (emojiB.aliases ? emojiB.aliases[0] : emojiB);
+
+    if (!searchedName) {
+        return doDefaultComparison(aName, bName);
+    }
+
+    // Have the emojis that start with the search appear first
     const aPrefix = aName.startsWith(searchedName);
     const bPrefix = bName.startsWith(searchedName);
 
-    if (aPrefix === bPrefix) {
-        if (customComparisonRules[aName]) {
-            return customComparisonRules[aName](bName) || defaultComparisonRule(aName, bName);
-        }
-
-        return defaultComparisonRule(aName, bName, searchedName);
+    if (aPrefix && bPrefix) {
+        return doDefaultComparison(aName, bName);
     } else if (aPrefix) {
         return -1;
+    } else if (bPrefix) {
+        return 1;
     }
 
-    return 1;
+    // Have the emojis that contain the search appear next
+    const aIncludes = aName.includes(searchedName);
+    const bIncludes = bName.includes(searchedName);
+
+    if (aIncludes && bIncludes) {
+        return doDefaultComparison(aName, bName);
+    } else if (aIncludes) {
+        return -1;
+    } else if (bIncludes) {
+        return 1;
+    }
+
+    return doDefaultComparison(aName, bName);
 }
